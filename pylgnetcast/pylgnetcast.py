@@ -157,7 +157,9 @@ class LgNetCastClient(object):
             LG_HANDLE_KEY_INPUT,
             "<value>%s</value>" % command,
         )
-        self._send_to_tv("command", message)
+        response = self._send_to_tv("command", message)
+        if response.status_code != requests.codes.ok:
+            _LOGGER.error(f"Failed to send command {command} to TV.")
 
     def query_device_info(self):
         """Get model information about the TV."""
