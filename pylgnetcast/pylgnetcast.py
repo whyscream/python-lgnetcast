@@ -163,15 +163,7 @@ class LgNetCastClient(object):
 
     def query_device_info(self):
         """Get model information about the TV."""
-        # We're using UDAP to retrieve this information, which requires a specific User-Agent.
-        # As self.HEADER is a class variable, we will make a copy to ensure we don't interfere
-        # with other instances 
-        try:
-            self.HEADER = {**self.HEADER, "User-Agent": "UDAP/2.0"}
-            response = self._send_to_tv("data", payload={"target": "rootservice.xml"})
-        finally:
-            # Remove the instance version of self.HEADER to restore original functionality
-            del self.HEADER 
+        response = self._send_to_tv("data", payload={"target": "rootservice.xml"}, udap=True)
         if response.status_code != requests.codes.ok:
             return None
         data = response.text
@@ -203,6 +195,7 @@ class LgNetCastClient(object):
 
     def query_data(self, query):
         """Query status information from the TV."""
+        # TODO: UDAP: yes or no?
         response = self._send_to_tv("data", payload={"target": query})
         if response.status_code == requests.codes.ok:
             data = response.text
@@ -263,19 +256,21 @@ class LgNetCastClient(object):
         """Send message to display the pair key on TV screen."""
         self._send_to_tv("auth", self.KEY)
 
-    def _send_to_tv(self, message_type, message=None, payload=None):
+    def _send_to_tv(self, message_type, message=None, payload=None, udap=False):
         """Send message of given type to the tv."""
-        _LOGGER.debug(f"_send_to_tv: message_type={message_type}, message={message}, payload={payload}")
+        _LOGGER.debug(f"_send_to_tv: {message_type=}, {message=}, {payload=}, {udap=}")
         if message_type == "command" and self.protocol == LG_PROTOCOL.HDCP:
             message_type = "dtv_wifirc"
+
         url = "%s%s" % (self.url, message_type)
+        headers = {**self.HEADER, "User-Agent": "UDAP/2.0"} if udap else self.HEADER
         if message:
             response = requests.post(
-                url, data=message, headers=self.HEADER, timeout=DEFAULT_TIMEOUT
+                url, data=message, headers=headers, timeout=DEFAULT_TIMEOUT
             )
         else:
             response = requests.get(
-                url, params=payload, headers=self.HEADER, timeout=DEFAULT_TIMEOUT
+                url, params=payload, headers=headers, timeout=DEFAULT_TIMEOUT
             )
         return response
 
