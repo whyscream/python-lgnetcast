@@ -38,7 +38,7 @@ DEFAULT_TIMEOUT = 3
 
 
 class LG_COMMAND(object):
-    """LG TV remote control commands."""
+    """LG TV remote control commands for ROAP protocol."""
 
     POWER = 1
     NUMBER_0 = 2
@@ -105,6 +105,64 @@ class LG_COMMAND(object):
     SWITCH_VIDEO = 416
     APPS = 417
 
+class LG_COMMAND_HDCP(object):
+    """LG TV remote control commands for HDCP protocol."""
+
+    POWER = 8
+    NUMBER_0 = 16
+    NUMBER_1 = 17
+    NUMBER_2 = 18
+    NUMBER_3 = 19
+    NUMBER_4 = 20
+    NUMBER_5 = 21
+    NUMBER_6 = 22
+    NUMBER_7 = 23
+    NUMBER_8 = 24
+    NUMBER_9 = 25
+    MUTE_TOGGLE = 9
+    HOME_MENU = 67
+    DASH = 76
+    FLASHBACK = 26
+    CHANNEL_LIST = 83
+    OK = 68
+    CHANNEL_UP = 0
+    CHANNEL_DOWN = 1
+    VOLUME_UP = 2
+    VOLUME_DOWN = 3
+    UP = 64
+    DOWN = 65
+    LEFT = 7
+    RIGHT = 6
+    BACK = 40
+    EXIT = 91
+    CONFIRM = 68
+    QUICK_MENU = 69
+    RED = 114
+    GREEN = 113
+    YELLOW = 99
+    BLUE = 97
+    LIVE_TV = 158
+    STOP = 177
+    PLAY = 176
+    PAUSE = 186
+    SKIP_BACKWARD = 143
+    SKIP_FORWARD = 142
+    RECORD = 189
+    EPG = 169
+    ENERGY_SAVING = 149
+    AV_MODE = 48
+    EXTERNAL_INPUT = 11
+    FAVORITE_CHANNEL = 30
+    SIMPLINK = 126
+    ASPECT_RATIO = 121
+    PROGRAM_INFORMATION = 170
+    NETCAST = 89
+    GUIDE = 169
+    SHOW_SUBTITLE = 57
+    TELE_TEXT = 32
+    TEXT_OPTION = 33
+    AUDIO_DESCRIPTION = 145
+
 
 class LG_QUERY(object):
     """LG TV data queries."""
@@ -149,9 +207,14 @@ class LgNetCastClient(object):
         """Context manager method to support with statement."""
         self._session = None
 
-    def send_command(self, command):
+    def send_command(self, command, command_protocol=LG_PROTOCOL.ROAP):
         """Send remote control commands to the TV."""
-        _LOGGER.debug(f"send_command: command={command}")
+        _LOGGER.debug(f"send_command: {command=} {command_protocol=}")
+        if self.protocol != command_protocol:
+            command = self._translate_command(command, command_protocol, self.protocol)
+            if command is None:
+                return
+
         message = self.COMMAND % (
             self._session,
             LG_HANDLE_KEY_INPUT,
@@ -273,6 +336,32 @@ class LgNetCastClient(object):
                 url, params=payload, headers=headers, timeout=DEFAULT_TIMEOUT
             )
         return response
+
+    @staticmethod
+    def _translate_command(command, from_protocol, to_protocol):
+        """
+        Translate command from one protocol to another.
+
+        It would be better if commands were previously implemented as strings instead of integers,
+        then this would a lot less ugly. But yay for legacy :)
+        """
+        _LOGGER.debug(f"_translate_command: {command=}, {from_protocol=}, {to_protocol=}")
+        if from_protocol == LG_PROTOCOL.ROAP and to_protocol == LG_PROTOCOL.HDCP:
+            source = LG_COMMAND
+            target = LG_COMMAND_HDCP
+        else:
+            source = LG_COMMAND_HDCP
+            target = LG_COMMAND
+
+        for attr in dir(target):
+            if not attr.startswith("__"):
+                if getattr(source, attr, None) == command:
+                    translated_command = getattr(target, attr, None)
+                    _LOGGER.info(f"Translated {from_protocol} command {command} to {to_protocol}: {translated_command}")
+                    return translated_command
+
+        _LOGGER.error(f"Command {command} not supported for {to_protocol} protocol.")
+        return None
 
 
 class LgNetCastError(Exception):
