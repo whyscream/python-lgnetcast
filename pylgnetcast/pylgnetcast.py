@@ -151,6 +151,7 @@ class LgNetCastClient(object):
 
     def send_command(self, command):
         """Send remote control commands to the TV."""
+        _LOGGER.debug(f"send_command: command={command}")
         message = self.COMMAND % (
             self._session,
             LG_HANDLE_KEY_INPUT,
@@ -253,6 +254,7 @@ class LgNetCastClient(object):
         data = response.text
         tree = ElementTree.XML(data)
         session = tree.find("session").text
+        _LOGGER.info(f"Session established: session={session}")
         return session
 
     def _display_pair_key(self):
@@ -261,7 +263,8 @@ class LgNetCastClient(object):
 
     def _send_to_tv(self, message_type, message=None, payload=None):
         """Send message of given type to the tv."""
-        if message_type != "command" and self.protocol == LG_PROTOCOL.HDCP:
+        _LOGGER.debug(f"_send_to_tv: message_type={message_type}, message={message}, payload={payload}")
+        if message_type == "command" and self.protocol == LG_PROTOCOL.HDCP:
             message_type = "dtv_wifirc"
         url = "%s%s" % (self.url, message_type)
         if message:
